@@ -1,6 +1,6 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
-<head>
+<head><meta name="ms-sp-authoring-source" content="agent">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -108,6 +108,7 @@ canvas{width:100%;height:160px}
       </div>
       <div class="row">
         <div><label>Sugar g</label><input id="fSugar" type="number" inputmode="decimal"></div>
+        <div><label>Fiber g</label><input id="fFib" type="number" inputmode="decimal"></div>
         <div><label>kcal</label><input id="fK" type="number" inputmode="decimal"></div>
       </div>
       <label class="chk"><input type="checkbox" id="fSave" checked> Save to My Foods (per 1 portion)</label>
@@ -160,8 +161,10 @@ canvas{width:100%;height:160px}
     <h3>Daily targets</h3>
     <label>Protein g / day</label><input id="tP" type="number" inputmode="decimal">
     <label>Carbs g / day</label><input id="tC" type="number" inputmode="decimal">
+    <label>Fat g / day</label><input id="tFat" type="number" inputmode="decimal">
     <label>Calories kcal / day</label><input id="tK" type="number" inputmode="decimal">
     <label>Sugar g / day</label><input id="tSugar" type="number" inputmode="decimal">
+    <label>Fiber g / day</label><input id="tFiber" type="number" inputmode="decimal">
     <label>Water ml / day</label><input id="tWater" type="number" inputmode="numeric">
     <label>Starting weight (kg)</label><input id="startW" type="number" inputmode="decimal">
     <label>Starting height (cm)</label><input id="startH" type="number" inputmode="decimal">
@@ -193,6 +196,8 @@ let S=readState()||{targets:{p:100,c:250,k:0,sugar:0,water:2000},food:{},measure
 function normalize(){
   S.targets=S.targets||{};S.food=S.food||{};S.measures=S.measures||[];S.water=S.water||{};S.starting=S.starting||{};S.myFoods=S.myFoods||[];
   if(S.targets.sugar===undefined)S.targets.sugar=0;
+  if(S.targets.fat===undefined)S.targets.fat=0;
+  if(S.targets.fiber===undefined)S.targets.fiber=0;
   if(S.targets.water===undefined)S.targets.water=2000;
 }
 normalize();
@@ -229,35 +234,35 @@ function show(v){
 $('dayDate').value=today();
 $('dayDate').onchange=renderDay;
 function dayTotals(d){
-  return (S.food[d]||[]).reduce((a,f)=>({p:a.p+num(f.p),c:a.c+num(f.c),fat:a.fat+num(f.fat),sugar:a.sugar+num(f.sugar),k:a.k+num(f.k)}),{p:0,c:0,fat:0,sugar:0,k:0});
+  return (S.food[d]||[]).reduce((a,f)=>({p:a.p+num(f.p),c:a.c+num(f.c),fat:a.fat+num(f.fat),sugar:a.sugar+num(f.sugar),fib:a.fib+num(f.fib),k:a.k+num(f.k)}),{p:0,c:0,fat:0,sugar:0,fib:0,k:0});
 }
 function bar(label,val,target,unit){
-  if(!target)return `<div class="muted">${label}: ${Math.round(val)} ${unit}</div>`;
+  if(!target)return `<div class="muted">${label}: ${Math.round(val)} ${unit} · set daily target in Settings</div>`;
   const pct=Math.min(100,val/target*100);
   return `<div style="font-size:14px">${label}: <b>${Math.round(val)}</b> / ${target} ${unit}</div><div class="bar ${val>=target?'done':''}"><div style="width:${pct}%"></div></div>`;
 }
 function waterTotal(d){return (S.water[d]||[]).reduce((a,v)=>a+num(v),0);}
 function renderDay(){
   const d=$('dayDate').value||today(),t=dayTotals(d),T=S.targets;
-  $('totals').innerHTML=bar('Protein',t.p,T.p,'g')+bar('Carbs',t.c,T.c,'g')+bar('Fat',t.fat,0,'g')+bar('Sugar',t.sugar,T.sugar,'g')+bar('Calories',t.k,T.k,'kcal')+bar('Water',waterTotal(d),T.water,'ml');
+  $('totals').innerHTML=bar('Protein',t.p,T.p,'g')+bar('Carbs',t.c,T.c,'g')+bar('Fat',t.fat,T.fat,'g')+bar('Sugar',t.sugar,T.sugar,'g')+bar('Fiber',t.fib,T.fiber,'g')+bar('Calories',t.k,T.k,'kcal')+bar('Water',waterTotal(d),T.water,'ml');
   $('waterTotal').textContent=waterTotal(d)+' ml logged';
   $('waterList').innerHTML=(S.water[d]||[]).map((v,i)=>`<div class="item"><span>${v} ml</span><button class="del" onclick="delWater('${d}',${i})">✕</button></div>`).join('');
   const list=S.food[d]||[];
   $('foodList').innerHTML=list.length?['Breakfast','Lunch','Dinner','Snack'].map(meal=>{
     const items=list.map((f,i)=>({f,i})).filter(x=>(x.f.meal||'Breakfast')===meal);
-    return items.length?`<h3>${meal}</h3>`+items.map(x=>`<div class="item"><div>${esc(x.f.n)}<br><small>P ${num(x.f.p)}g · C ${num(x.f.c)}g · F ${num(x.f.fat)}g · Sugar ${num(x.f.sugar)}g · ${num(x.f.k)} kcal</small></div><button class="del" onclick="delFood('${d}',${x.i})">✕</button></div>`).join(''):'';
+    return items.length?`<h3>${meal}</h3>`+items.map(x=>`<div class="item"><div>${esc(x.f.n)}<br><small>P ${num(x.f.p)}g · C ${num(x.f.c)}g · F ${num(x.f.fat)}g · Sugar ${num(x.f.sugar)}g · Fiber ${num(x.f.fib)}g · ${num(x.f.k)} kcal</small></div><button class="del" onclick="delFood('${d}',${x.i})">✕</button></div>`).join(''):'';
   }).join(''):'<p class="muted">Nothing yet.</p>';
   const seen={};recent=[];
   Object.keys(S.food).sort().reverse().forEach(k=>S.food[k].slice().reverse().forEach(f=>{if(!seen[f.n]&&recent.length<6){seen[f.n]=1;recent.push(f);}}));
   $('quick').innerHTML=recent.length?'<label>Quick add</label>'+recent.map((f,i)=>`<button class="sec" style="font-size:14px;padding:8px;margin-top:6px" onclick="quickAdd(${i})">${esc(f.n)} (P ${num(f.p)}g)</button>`).join(''):'';
 }
 function addFood(){
-  const f={n:$('fName').value.trim()||'Food',p:num($('fP').value),c:num($('fC').value),fat:num($('fFat').value),sugar:num($('fSugar').value),k:num($('fK').value),meal:selectedMeal};
-  if(!f.p&&!f.c&&!f.fat&&!f.sugar&&!f.k)return alert('Enter at least one value');
+  const f={n:$('fName').value.trim()||'Food',p:num($('fP').value),c:num($('fC').value),fat:num($('fFat').value),sugar:num($('fSugar').value),fib:num($('fFib').value),k:num($('fK').value),meal:selectedMeal};
+  if(!f.p&&!f.c&&!f.fat&&!f.sugar&&!f.fib&&!f.k)return alert('Enter at least one value');
   const d=$('dayDate').value||today();(S.food[d]=S.food[d]||[]).push(f);
-  if($('fSave').checked&&$('fName').value.trim()){S.myFoods=S.myFoods.filter(x=>x.n!==f.n);S.myFoods.push({n:f.n,u:'portion',b:1,k:f.k,p:f.p,c:f.c,s:f.sugar,f:f.fat,o:[0.5,1,2]});}
+  if($('fSave').checked&&$('fName').value.trim()){S.myFoods=S.myFoods.filter(x=>x.n!==f.n);S.myFoods.push({n:f.n,u:'portion',b:1,k:f.k,p:f.p,c:f.c,s:f.sugar,f:f.fat,fib:f.fib,o:[0.5,1,2]});}
   save();buildList();
-  ['fName','fP','fC','fFat','fSugar','fK'].forEach(i=>$(i).value='');renderDay();
+  ['fName','fP','fC','fFat','fSugar','fFib','fK'].forEach(i=>$(i).value='');renderDay();
 }
 function quickAdd(i){const f=recent[i];if(!f)return;const d=$('dayDate').value||today();(S.food[d]=S.food[d]||[]).push({...f,meal:selectedMeal});save();renderDay();}
 function delFood(d,i){if(!S.food[d]||!confirm('Delete this food?'))return;S.food[d].splice(i,1);if(!S.food[d].length)delete S.food[d];save();renderDay();}
@@ -318,12 +323,12 @@ function renderBody(){
 
 /* SETTINGS */
 function renderSet(){
-  $('tP').value=S.targets.p||'';$('tC').value=S.targets.c||'';$('tK').value=S.targets.k||'';$('tSugar').value=S.targets.sugar||'';$('tWater').value=S.targets.water||'';
+  $('tP').value=S.targets.p||'';$('tC').value=S.targets.c||'';$('tFat').value=S.targets.fat||'';$('tK').value=S.targets.k||'';$('tSugar').value=S.targets.sugar||'';$('tFiber').value=S.targets.fiber||'';$('tWater').value=S.targets.water||'';
   $('startW').value=S.starting.w||'';$('startH').value=S.starting.h||'';
   $('lastBackup').textContent=S.lastBackup?'Last backup: '+S.lastBackup:'No backup yet.';
 }
 function saveTargets(){
-  S.targets={p:num($('tP').value),c:num($('tC').value),k:num($('tK').value),sugar:num($('tSugar').value),water:num($('tWater').value)};
+  S.targets={p:num($('tP').value),c:num($('tC').value),fat:num($('tFat').value),k:num($('tK').value),sugar:num($('tSugar').value),fiber:num($('tFiber').value),water:num($('tWater').value)};
   S.starting={w:num($('startW').value),h:num($('startH').value)};
   // put starting weight/height into history once, if history is empty
   if(!S.measures.length&&(S.starting.w||S.starting.h))S.measures.push({d:today(),w:S.starting.w,h:S.starting.h,wa:0,pu:0});
@@ -345,35 +350,47 @@ function importData(e){
 }
 
 /* FOOD LIST (values per base amount) */
-// [name, unit, base, kcal, protein, carbs, sugar, fat, quick options]
-const G=[50,100,150,200,250];
+// [name, unit, base, kcal, protein, carbs, sugar, fat, fiber, quick options]
+const G=[50,100,150,200,250],D=[250,330,500];
 const FOODS=[
- ['🥚 Egg, medium','pcs',1,63,5.5,0.3,0.2,4.2,[1,2,3,4]],
- ['🍞 Toast bread (slice 25 g)','slice',1,67,2.3,12.3,1.3,0.9,[1,2,3,4]],
- ['🥖 Rohlík (50 g)','pcs',1,150,4.5,29,1.5,1.5,[0.5,1,2,3]],
- ['🍗 Chicken breast, grilled','g',10,17,3.1,0,0,0.4,G],
- ['🐟 Salmon, cooked','g',10,21,2.0,0,0,1.3,G],
- ['🥩 Beef / steak, cooked','g',10,22,2.3,0,0,1.3,G],
- ['🥓 Ham, lean (slice ~15 g)','slice',1,18,3.0,0.3,0.3,0.6,[1,2,3,4,5]],
- ['🌭 Salami (slice ~10 g)','slice',1,40,2.2,0.1,0.1,3.4,[1,2,3,4,5,6]],
- ['🧀 Cheese','g',10,40,2.5,0.1,0.1,3.3,[10,20,30,50,100]],
- ['🍚 Rice, cooked','g',10,13,0.3,2.8,0,0,G],
- ['🍝 Pasta, cooked','g',10,16,0.6,3.1,0.1,0.1,G],
- ['🥔 Potatoes, boiled','g',10,8,0.2,1.8,0.1,0,G],
- ['🥔 Mashed potatoes','g',10,11,0.2,1.7,0.2,0.4,G],
- ['🍌 Banana, medium','pcs',1,105,1.3,27,14,0.4,[0.5,1,2]],
- ['🍎 Apple, medium','pcs',1,111,0.4,26.9,19,0.4,[0.5,1,2]],
- ['🥛 Milk, whole','ml',100,61,3.3,4.6,4.6,3.2,[100,200,250,300,500]],
- ['🥣 Greek yogurt / Skyr, plain','g',100,65,9,4.5,4,1.8,[100,150,200,250]],
- ['🥤 Protein powder','scoop',1,120,24,3,1.5,2,[0.5,1,1.5,2]],
- ['🍕 Pizza, cheese (slice)','slice',1,270,11,33,4,10,[1,2,3,4]],
- ['🍟 McDonald\'s fries, medium','portion',1,330,4,41,0.5,16,[1]],
- ['🍟 McDonald\'s fries, large','portion',1,440,5.5,55,0.7,21,[1]],
- ['🍗 McDonald\'s McNugget','pcs',1,44,2.8,3.3,0.1,2.2,[1,3,6,9,20]],
- ['🍫 Granko','tsp',1,15,0.2,3.2,3.1,0.1,[1,2,3,4]],
- ['🍫 Nutella','tsp',1,27,0.3,2.9,2.8,1.5,[1,2,3,4]],
- ['🥜 Peanut butter','tsp',1,29,1.3,1.0,0.5,2.5,[1,2,3,4]]
-].map(a=>({n:a[0],u:a[1],b:a[2],k:a[3],p:a[4],c:a[5],s:a[6],f:a[7],o:a[8]}));
+ ['🥚 Egg, medium','pcs',1,63,5.5,0.3,0.2,4.2,0,[1,2,3,4]],
+ ['🍞 Toast bread (slice 25 g)','slice',1,67,2.3,12.3,1.3,0.9,0.7,[1,2,3,4]],
+ ['🥖 Rohlík (50 g)','pcs',1,150,4.5,29,1.5,1.5,1.5,[0.5,1,2,3]],
+ ['🍗 Chicken breast, grilled','g',10,17,3.1,0,0,0.4,0,G],
+ ['🐟 Salmon, cooked','g',10,21,2.0,0,0,1.3,0,G],
+ ['🥩 Beef / steak, cooked','g',10,22,2.3,0,0,1.3,0,G],
+ ['🥓 Ham, lean (slice ~15 g)','slice',1,18,3.0,0.3,0.3,0.6,0,[1,2,3,4,5]],
+ ['🌭 Salami (slice ~10 g)','slice',1,40,2.2,0.1,0.1,3.4,0,[1,2,3,4,5,6]],
+ ['🧀 Cheese','g',10,40,2.5,0.1,0.1,3.3,0,[10,20,30,50,100]],
+ ['🍚 Rice, cooked','g',10,13,0.3,2.8,0,0,0,G],
+ ['🍝 Pasta, cooked','g',10,16,0.6,3.1,0.1,0.1,0.2,G],
+ ['🥔 Potatoes, boiled','g',10,8,0.2,1.8,0.1,0,0.2,G],
+ ['🥔 Mashed potatoes','g',10,11,0.2,1.7,0.2,0.4,0.2,G],
+ ['🥦 Broccoli, cooked','g',100,35,2.4,7.2,1.4,0.4,3.3,[50,100,150,200]],
+ ['🥒 Cucumber','g',100,15,0.7,3.6,1.7,0.1,0.5,[50,100,150,200]],
+ ['🍅 Cherry tomato (piece)','pcs',1,3,0.1,0.6,0.4,0,0.2,[3,5,8,10]],
+ ['🥬 Green salad / lettuce','g',100,15,1.4,2.9,0.8,0.2,1.3,[30,50,100]],
+ ['🍌 Banana, medium','pcs',1,105,1.3,27,14,0.4,3.1,[0.5,1,2]],
+ ['🍎 Apple, medium','pcs',1,111,0.4,26.9,19,0.4,4.8,[0.5,1,2]],
+ ['🥛 Milk, whole 3.5%','ml',100,61,3.3,4.6,4.6,3.2,0,[100,200,250,300,500]],
+ ['🥛 Milk, semi-skimmed 1.5%','ml',100,46,3.4,4.8,4.8,1.5,0,[100,200,250,300,500]],
+ ['☕ Cappuccino with milk, no sugar','cup',1,75,4,6,6,4,0,[1,2]],
+ ['🥄 Sugar','tsp',1,16,0,4,4,0,0,[1,2,3]],
+ ['🥣 Greek yogurt / Skyr, plain','g',100,65,9,4.5,4,1.8,0,[100,150,200,250]],
+ ['🥤 Protein powder','scoop',1,120,24,3,1.5,2,1,[0.5,1,1.5,2]],
+ ['🥤 Coca-Cola','ml',100,42,0,10.6,10.6,0,0,D],
+ ['🥤 Coca-Cola Zero','ml',100,0.3,0,0,0,0,0,D],
+ ['🥤 Sprite','ml',100,19,0,4.6,4.6,0,0,D],
+ ['🥤 Fanta Orange','ml',100,19,0,4.6,4.6,0,0,D],
+ ['🧃 Lipton Ice Tea','ml',100,19,0,4.5,4.5,0,0,D],
+ ['🍕 Pizza, cheese (slice)','slice',1,270,11,33,4,10,2.3,[1,2,3,4]],
+ ['🍟 McDonald\'s fries, medium','portion',1,330,4,41,0.5,16,4,[1]],
+ ['🍟 McDonald\'s fries, large','portion',1,440,5.5,55,0.7,21,5,[1]],
+ ['🍗 McDonald\'s McNugget','pcs',1,44,2.8,3.3,0.1,2.2,0.2,[1,3,6,9,20]],
+ ['🍫 Granko','tsp',1,15,0.2,3.2,3.1,0.1,0.1,[1,2,3,4]],
+ ['🍫 Nutella','tsp',1,27,0.3,2.9,2.8,1.5,0.2,[1,2,3,4]],
+ ['🥜 Peanut butter','tsp',1,29,1.3,1.0,0.5,2.5,0.3,[1,2,3,4]]
+].map(a=>({n:a[0],u:a[1],b:a[2],k:a[3],p:a[4],c:a[5],s:a[6],f:a[7],fib:a[8],o:a[9]}));
 let ALL=[];
 const r1=v=>Math.round(v*10)/10;
 function buildList(){
@@ -396,9 +413,9 @@ function pickFood(){
 }
 function setAmt(v){$('lAmt').value=v;previewList();}
 function calc(){const f=curFood(),a=num($('lAmt').value),m=a/f.b;
-  return {f,a,v:{k:Math.round(f.k*m),p:r1(f.p*m),c:r1(f.c*m),sugar:r1(f.s*m),fat:r1(f.f*m)}};}
+  return {f,a,v:{k:Math.round(f.k*m),p:r1(f.p*m),c:r1(f.c*m),sugar:r1(f.s*m),fat:r1(f.f*m),fib:r1((f.fib||0)*m)}};}
 function previewList(){const {v}=calc();
-  $('lPrev').innerHTML=`<b>${v.k} kcal</b> · Protein ${v.p} g · Carbs ${v.c} g · Sugar ${v.sugar} g · Fat ${v.fat} g`;}
+  $('lPrev').innerHTML=`<b>${v.k} kcal</b> · Protein ${v.p} g · Carbs ${v.c} g · Sugar ${v.sugar} g · Fat ${v.fat} g · Fiber ${v.fib} g`;}
 function addFromList(){
   const {f,a,v}=calc();if(!a)return alert('Enter amount');
   const d=$('dayDate').value||today();
