@@ -57,6 +57,14 @@ canvas{width:100%;height:160px}
 .meal-choice{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:78px;padding:9px 4px;margin:0;border:1px solid #e9e5ff;border-radius:17px;background:#fff;color:#625d7b;box-shadow:0 3px 10px #5441a20d;font-size:12px;font-weight:750}
 .meal-choice .meal-icon{font-size:25px;line-height:1}
 .meal-choice.selected{background:linear-gradient(145deg,#6f5bea,#a45fe2);color:#fff;border-color:transparent;box-shadow:0 7px 15px #7555df45;transform:translateY(-2px)}
+.mode{display:flex;gap:6px;background:#f0eeff;padding:4px;border-radius:15px;margin:4px 0 10px}
+.mode button{margin:0;padding:10px;font-size:14px;background:none;color:#5040c8;box-shadow:none}
+.mode button.on{background:linear-gradient(115deg,#6554e8,#8354e7);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{width:auto;margin:0;padding:8px 12px;font-size:14px;background:#eeedff;color:#5040c8;box-shadow:none}
+.preview{background:#f7f6ff;border-radius:14px;padding:10px 12px;margin-top:10px;font-size:14px}
+.chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:var(--txt)}
+.chk input{width:auto;margin:0}
 @media(max-width:360px){.meal-picker{gap:5px}.meal-choice{font-size:11px;min-height:72px}}
 </style>
 </head>
@@ -79,17 +87,32 @@ canvas{width:100%;height:160px}
       <button type="button" class="meal-choice" data-meal="Dinner" onclick="chooseMeal('Dinner')"><span class="meal-icon">🍜</span><span>Dinner</span></button>
       <button type="button" class="meal-choice" data-meal="Snack" onclick="chooseMeal('Snack')"><span class="meal-icon">🍓</span><span>Snack</span></button>
     </div>
-    <label>Food</label><input id="fName" placeholder="e.g. Chicken + rice">
-    <div class="row">
-      <div><label>Protein g</label><input id="fP" type="number" inputmode="decimal"></div>
-      <div><label>Carbs g</label><input id="fC" type="number" inputmode="decimal"></div>
-      <div><label>Fat g</label><input id="fFat" type="number" inputmode="decimal"></div>
+    <div class="mode">
+      <button type="button" id="btnList" class="on" onclick="setMode('list')">📋 From list</button>
+      <button type="button" id="btnMan" onclick="setMode('man')">✍️ Type it myself</button>
     </div>
-    <div class="row">
-      <div><label>Sugar g</label><input id="fSugar" type="number" inputmode="decimal"></div>
-      <div><label>kcal</label><input id="fK" type="number" inputmode="decimal"></div>
+    <div id="modeList">
+      <label>Food</label><select id="lFood" onchange="pickFood()"></select>
+      <label id="lAmtLbl">Amount</label><input id="lAmt" type="number" inputmode="decimal" oninput="previewList()">
+      <div class="chips" id="lChips"></div>
+      <div class="preview" id="lPrev"></div>
+      <button onclick="addFromList()">Add</button>
+      <p class="muted">Not on the list? Tap “Type it myself” and copy values from the package label.</p>
     </div>
-    <button onclick="addFood()">Add</button>
+    <div id="modeMan" class="hide">
+      <label>Food</label><input id="fName" placeholder="e.g. Chicken + rice">
+      <div class="row">
+        <div><label>Protein g</label><input id="fP" type="number" inputmode="decimal"></div>
+        <div><label>Carbs g</label><input id="fC" type="number" inputmode="decimal"></div>
+        <div><label>Fat g</label><input id="fFat" type="number" inputmode="decimal"></div>
+      </div>
+      <div class="row">
+        <div><label>Sugar g</label><input id="fSugar" type="number" inputmode="decimal"></div>
+        <div><label>kcal</label><input id="fK" type="number" inputmode="decimal"></div>
+      </div>
+      <label class="chk"><input type="checkbox" id="fSave" checked> Save to My Foods (per 1 portion)</label>
+      <button onclick="addFood()">Add</button>
+    </div>
     <div id="quick"></div>
   </div>
   <div class="card water-card">
@@ -168,7 +191,7 @@ let canStore=true;
 function readState(){try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){canStore=false;return null;}}
 let S=readState()||{targets:{p:100,c:250,k:0,sugar:0,water:2000},food:{},measures:[]};
 function normalize(){
-  S.targets=S.targets||{};S.food=S.food||{};S.measures=S.measures||[];S.water=S.water||{};S.starting=S.starting||{};
+  S.targets=S.targets||{};S.food=S.food||{};S.measures=S.measures||[];S.water=S.water||{};S.starting=S.starting||{};S.myFoods=S.myFoods||[];
   if(S.targets.sugar===undefined)S.targets.sugar=0;
   if(S.targets.water===undefined)S.targets.water=2000;
 }
@@ -231,7 +254,9 @@ function renderDay(){
 function addFood(){
   const f={n:$('fName').value.trim()||'Food',p:num($('fP').value),c:num($('fC').value),fat:num($('fFat').value),sugar:num($('fSugar').value),k:num($('fK').value),meal:selectedMeal};
   if(!f.p&&!f.c&&!f.fat&&!f.sugar&&!f.k)return alert('Enter at least one value');
-  const d=$('dayDate').value||today();(S.food[d]=S.food[d]||[]).push(f);save();
+  const d=$('dayDate').value||today();(S.food[d]=S.food[d]||[]).push(f);
+  if($('fSave').checked&&$('fName').value.trim()){S.myFoods=S.myFoods.filter(x=>x.n!==f.n);S.myFoods.push({n:f.n,u:'portion',b:1,k:f.k,p:f.p,c:f.c,s:f.sugar,f:f.fat,o:[0.5,1,2]});}
+  save();buildList();
   ['fName','fP','fC','fFat','fSugar','fK'].forEach(i=>$(i).value='');renderDay();
 }
 function quickAdd(i){const f=recent[i];if(!f)return;const d=$('dayDate').value||today();(S.food[d]=S.food[d]||[]).push({...f,meal:selectedMeal});save();renderDay();}
@@ -315,10 +340,78 @@ function exportData(){
 function importData(e){
   const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.food||!d.measures)throw 0;
-    if(confirm('Replace current data with this backup?')){S=d;normalize();save();alert('Restored');show('day');}}catch(err){alert('Not a valid backup file');}};
+    if(confirm('Replace current data with this backup?')){S=d;normalize();save();buildList();alert('Restored');show('day');}}catch(err){alert('Not a valid backup file');}};
   r.readAsText(f);e.target.value='';
 }
 
+/* FOOD LIST (values per base amount) */
+// [name, unit, base, kcal, protein, carbs, sugar, fat, quick options]
+const G=[50,100,150,200,250];
+const FOODS=[
+ ['🥚 Egg, medium','pcs',1,63,5.5,0.3,0.2,4.2,[1,2,3,4]],
+ ['🍞 Toast bread (slice 25 g)','slice',1,67,2.3,12.3,1.3,0.9,[1,2,3,4]],
+ ['🥖 Rohlík (50 g)','pcs',1,150,4.5,29,1.5,1.5,[0.5,1,2,3]],
+ ['🍗 Chicken breast, grilled','g',10,17,3.1,0,0,0.4,G],
+ ['🐟 Salmon, cooked','g',10,21,2.0,0,0,1.3,G],
+ ['🥩 Beef / steak, cooked','g',10,22,2.3,0,0,1.3,G],
+ ['🥓 Ham, lean (slice ~15 g)','slice',1,18,3.0,0.3,0.3,0.6,[1,2,3,4,5]],
+ ['🌭 Salami (slice ~10 g)','slice',1,40,2.2,0.1,0.1,3.4,[1,2,3,4,5,6]],
+ ['🧀 Cheese','g',10,40,2.5,0.1,0.1,3.3,[10,20,30,50,100]],
+ ['🍚 Rice, cooked','g',10,13,0.3,2.8,0,0,G],
+ ['🍝 Pasta, cooked','g',10,16,0.6,3.1,0.1,0.1,G],
+ ['🥔 Potatoes, boiled','g',10,8,0.2,1.8,0.1,0,G],
+ ['🥔 Mashed potatoes','g',10,11,0.2,1.7,0.2,0.4,G],
+ ['🍌 Banana, medium','pcs',1,105,1.3,27,14,0.4,[0.5,1,2]],
+ ['🍎 Apple, medium','pcs',1,111,0.4,26.9,19,0.4,[0.5,1,2]],
+ ['🥛 Milk, whole','ml',100,61,3.3,4.6,4.6,3.2,[100,200,250,300,500]],
+ ['🥣 Greek yogurt / Skyr, plain','g',100,65,9,4.5,4,1.8,[100,150,200,250]],
+ ['🥤 Protein powder','scoop',1,120,24,3,1.5,2,[0.5,1,1.5,2]],
+ ['🍕 Pizza, cheese (slice)','slice',1,270,11,33,4,10,[1,2,3,4]],
+ ['🍟 McDonald\'s fries, medium','portion',1,330,4,41,0.5,16,[1]],
+ ['🍟 McDonald\'s fries, large','portion',1,440,5.5,55,0.7,21,[1]],
+ ['🍗 McDonald\'s McNugget','pcs',1,44,2.8,3.3,0.1,2.2,[1,3,6,9,20]],
+ ['🍫 Granko','tsp',1,15,0.2,3.2,3.1,0.1,[1,2,3,4]],
+ ['🍫 Nutella','tsp',1,27,0.3,2.9,2.8,1.5,[1,2,3,4]],
+ ['🥜 Peanut butter','tsp',1,29,1.3,1.0,0.5,2.5,[1,2,3,4]]
+].map(a=>({n:a[0],u:a[1],b:a[2],k:a[3],p:a[4],c:a[5],s:a[6],f:a[7],o:a[8]}));
+let ALL=[];
+const r1=v=>Math.round(v*10)/10;
+function buildList(){
+  const keep=$('lFood').value;
+  ALL=FOODS.concat(S.myFoods.map(x=>({...x,mine:1})));
+  let h='<optgroup label="Food list">'+FOODS.map((f,i)=>`<option value="${i}">${esc(f.n)}</option>`).join('')+'</optgroup>';
+  if(S.myFoods.length)h+='<optgroup label="❤️ My Foods">'+S.myFoods.map((f,i)=>`<option value="${FOODS.length+i}">❤️ ${esc(f.n)}</option>`).join('')+'</optgroup>';
+  $('lFood').innerHTML=h;
+  if(keep!==''&&ALL[keep])$('lFood').value=keep;
+  pickFood();
+}
+function curFood(){return ALL[num($('lFood').value)];}
+function pickFood(){
+  const f=curFood();if(!f)return;
+  $('lAmtLbl').textContent='Amount ('+f.u+')';
+  $('lAmt').value=f.u==='g'||f.u==='ml'?f.o[1]||f.o[0]:1;
+  $('lChips').innerHTML=f.o.map(v=>`<button type="button" onclick="setAmt(${v})">${v} ${f.u}</button>`).join('')+
+    (f.mine?`<button type="button" style="background:#ffe9ee;color:#c0405c" onclick="delMyFood()">🗑 Remove from My Foods</button>`:'');
+  previewList();
+}
+function setAmt(v){$('lAmt').value=v;previewList();}
+function calc(){const f=curFood(),a=num($('lAmt').value),m=a/f.b;
+  return {f,a,v:{k:Math.round(f.k*m),p:r1(f.p*m),c:r1(f.c*m),sugar:r1(f.s*m),fat:r1(f.f*m)}};}
+function previewList(){const {v}=calc();
+  $('lPrev').innerHTML=`<b>${v.k} kcal</b> · Protein ${v.p} g · Carbs ${v.c} g · Sugar ${v.sugar} g · Fat ${v.fat} g`;}
+function addFromList(){
+  const {f,a,v}=calc();if(!a)return alert('Enter amount');
+  const d=$('dayDate').value||today();
+  (S.food[d]=S.food[d]||[]).push({n:`${f.mine?f.n:f.n.replace(/^\S+\s/,'')} – ${a} ${f.u}`,...v,meal:selectedMeal});
+  save();renderDay();
+}
+function delMyFood(){const f=curFood();if(!f||!f.mine||!confirm('Remove from My Foods?'))return;
+  S.myFoods=S.myFoods.filter(x=>x.n!==f.n);save();$('lFood').value='0';buildList();}
+function setMode(m){
+  $('modeList').classList.toggle('hide',m!=='list');$('modeMan').classList.toggle('hide',m!=='man');
+  $('btnList').classList.toggle('on',m==='list');$('btnMan').classList.toggle('on',m==='man');
+}
+buildList();
 renderDay();
 </script>
 </body>
