@@ -65,6 +65,8 @@ canvas{width:100%;height:160px}
 .preview{background:#f7f6ff;border-radius:14px;padding:10px 12px;margin-top:10px;font-size:14px}
 .chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:var(--txt)}
 .chk input{width:auto;margin:0}
+.chips button.cat{font-size:15px;padding:10px 16px}
+.chips button.cat.on{background:linear-gradient(115deg,#6554e8,#8354e7);color:#fff}
 @media(max-width:360px){.meal-picker{gap:5px}.meal-choice{font-size:11px;min-height:72px}}
 </style>
 </head>
@@ -80,19 +82,14 @@ canvas{width:100%;height:160px}
     <div id="totals"></div>
   </div>
   <div class="card">
-    <h3>Add to a meal</h3>
-    <div class="meal-picker" role="group" aria-label="Choose a meal">
-      <button type="button" class="meal-choice selected" data-meal="Breakfast" onclick="chooseMeal('Breakfast')"><span class="meal-icon">🥞</span><span>Breakfast</span></button>
-      <button type="button" class="meal-choice" data-meal="Lunch" onclick="chooseMeal('Lunch')"><span class="meal-icon">🥪</span><span>Lunch</span></button>
-      <button type="button" class="meal-choice" data-meal="Dinner" onclick="chooseMeal('Dinner')"><span class="meal-icon">🍜</span><span>Dinner</span></button>
-      <button type="button" class="meal-choice" data-meal="Snack" onclick="chooseMeal('Snack')"><span class="meal-icon">🍓</span><span>Snack</span></button>
-    </div>
+    <h3>Add food or drink</h3>
     <div class="mode">
       <button type="button" id="btnList" class="on" onclick="setMode('list')">📋 From list</button>
       <button type="button" id="btnMan" onclick="setMode('man')">✍️ Type it myself</button>
     </div>
     <div id="modeList">
-      <label>Food</label><select id="lFood" onchange="pickFood()"></select>
+      <div class="chips" id="catTabs"></div>
+      <label id="lFoodLbl">Bread & breakfast</label><select id="lFood" onchange="pickFood()"></select>
       <label id="lAmtLbl">Amount</label><input id="lAmt" type="number" inputmode="decimal" oninput="previewList()">
       <div class="chips" id="lChips"></div>
       <div class="preview" id="lPrev"></div>
@@ -111,6 +108,7 @@ canvas{width:100%;height:160px}
         <div><label>Fiber g</label><input id="fFib" type="number" inputmode="decimal"></div>
         <div><label>kcal</label><input id="fK" type="number" inputmode="decimal"></div>
       </div>
+      <label>Save in list</label><select id="fCat"></select>
       <label class="chk"><input type="checkbox" id="fSave" checked> Save to My Foods (per 1 portion)</label>
       <button onclick="addFood()">Add</button>
     </div>
@@ -248,10 +246,7 @@ function renderDay(){
   $('waterTotal').textContent=waterTotal(d)+' ml logged';
   $('waterList').innerHTML=(S.water[d]||[]).map((v,i)=>`<div class="item"><span>${v} ml</span><button class="del" onclick="delWater('${d}',${i})">✕</button></div>`).join('');
   const list=S.food[d]||[];
-  $('foodList').innerHTML=list.length?['Breakfast','Lunch','Dinner','Snack'].map(meal=>{
-    const items=list.map((f,i)=>({f,i})).filter(x=>(x.f.meal||'Breakfast')===meal);
-    return items.length?`<h3>${meal}</h3>`+items.map(x=>`<div class="item"><div>${esc(x.f.n)}<br><small>P ${num(x.f.p)}g · C ${num(x.f.c)}g · F ${num(x.f.fat)}g · Sugar ${num(x.f.sugar)}g · Fiber ${num(x.f.fib)}g · ${num(x.f.k)} kcal</small></div><button class="del" onclick="delFood('${d}',${x.i})">✕</button></div>`).join(''):'';
-  }).join(''):'<p class="muted">Nothing yet.</p>';
+  $('foodList').innerHTML=list.length?list.map((f,i)=>`<div class="item"><div>${esc(f.n)}<br><small>P ${num(f.p)}g · C ${num(f.c)}g · F ${num(f.fat)}g · Sugar ${num(f.sugar)}g · Fiber ${num(f.fib)}g · ${num(f.k)} kcal</small></div><button class="del" onclick="delFood('${d}',${i})">✕</button></div>`).join(''):'<p class="muted">Nothing yet.</p>';
   const seen={};recent=[];
   Object.keys(S.food).sort().reverse().forEach(k=>S.food[k].slice().reverse().forEach(f=>{if(!seen[f.n]&&recent.length<6){seen[f.n]=1;recent.push(f);}}));
   $('quick').innerHTML=recent.length?'<label>Quick add</label>'+recent.map((f,i)=>`<button class="sec" style="font-size:14px;padding:8px;margin-top:6px" onclick="quickAdd(${i})">${esc(f.n)} (P ${num(f.p)}g)</button>`).join(''):'';
@@ -260,7 +255,7 @@ function addFood(){
   const f={n:$('fName').value.trim()||'Food',p:num($('fP').value),c:num($('fC').value),fat:num($('fFat').value),sugar:num($('fSugar').value),fib:num($('fFib').value),k:num($('fK').value),meal:selectedMeal};
   if(!f.p&&!f.c&&!f.fat&&!f.sugar&&!f.fib&&!f.k)return alert('Enter at least one value');
   const d=$('dayDate').value||today();(S.food[d]=S.food[d]||[]).push(f);
-  if($('fSave').checked&&$('fName').value.trim()){S.myFoods=S.myFoods.filter(x=>x.n!==f.n);S.myFoods.push({n:f.n,u:'portion',b:1,k:f.k,p:f.p,c:f.c,s:f.sugar,f:f.fat,fib:f.fib,o:[0.5,1,2]});}
+  if($('fSave').checked&&$('fName').value.trim()){S.myFoods=S.myFoods.filter(x=>x.n!==f.n);S.myFoods.push({n:f.n,u:'portion',b:1,k:f.k,p:f.p,c:f.c,s:f.sugar,f:f.fat,fib:f.fib,cat:$('fCat').value,o:[0.5,1,2]});}
   save();buildList();
   ['fName','fP','fC','fFat','fSugar','fFib','fK'].forEach(i=>$(i).value='');renderDay();
 }
@@ -372,34 +367,63 @@ const FOODS=[
  ['🥬 Green salad / lettuce','g',100,15,1.4,2.9,0.8,0.2,1.3,[30,50,100]],
  ['🍌 Banana, medium','pcs',1,105,1.3,27,14,0.4,3.1,[0.5,1,2]],
  ['🍎 Apple, medium','pcs',1,111,0.4,26.9,19,0.4,4.8,[0.5,1,2]],
- ['🥛 Milk, whole 3.5%','ml',100,61,3.3,4.6,4.6,3.2,0,[100,200,250,300,500]],
- ['🥛 Milk, semi-skimmed 1.5%','ml',100,46,3.4,4.8,4.8,1.5,0,[100,200,250,300,500]],
- ['☕ Cappuccino with milk, no sugar','cup',1,75,4,6,6,4,0,[1,2]],
+ ['🥛 Milk, whole 3.5%','ml',100,61,3.3,4.6,4.6,3.2,0,[100,200,250,300,500],1],
+ ['🥛 Milk, semi-skimmed 1.5%','ml',100,46,3.4,4.8,4.8,1.5,0,[100,200,250,300,500],1],
+ ['☕ Cappuccino with milk, no sugar','cup',1,75,4,6,6,4,0,[1,2],1],
  ['🥄 Sugar','tsp',1,16,0,4,4,0,0,[1,2,3]],
+ ['🐟 Treska Cottage Exklusiv (pack 140 g)','g',100,178,10,8.8,3.0,13,0,[35,70,105,140]],
  ['🥣 Greek yogurt / Skyr, plain','g',100,65,9,4.5,4,1.8,0,[100,150,200,250]],
- ['🥤 Protein powder','scoop',1,120,24,3,1.5,2,1,[0.5,1,1.5,2]],
- ['🥤 Coca-Cola','ml',100,42,0,10.6,10.6,0,0,D],
- ['🥤 Coca-Cola Zero','ml',100,0.3,0,0,0,0,0,D],
- ['🥤 Sprite','ml',100,19,0,4.6,4.6,0,0,D],
- ['🥤 Fanta Orange','ml',100,19,0,4.6,4.6,0,0,D],
- ['🧃 Lipton Ice Tea','ml',100,19,0,4.5,4.5,0,0,D],
+ ['🥤 Protein shake (powder)','scoop',1,120,24,3,1.5,2,1,[0.5,1,1.5,2],1],
+ ['🥤 Coca-Cola','ml',100,42,0,10.6,10.6,0,0,D,1],
+ ['🥤 Coca-Cola Zero','ml',100,0.3,0,0,0,0,0,D,1],
+ ['🥤 Sprite','ml',100,19,0,4.6,4.6,0,0,D,1],
+ ['🥤 Fanta Orange','ml',100,19,0,4.6,4.6,0,0,D,1],
+ ['🧃 Lipton Ice Tea','ml',100,19,0,4.5,4.5,0,0,D,1],
+ ['🍜 Chicken noodle soup','ml',100,25,1.7,1.9,0.4,1.1,0.3,[250,300,400,500]],
+ ['🍛 Chicken fried rice','g',100,170,7,22,1,6,1,[200,300,400,500]],
+ ['🍜 Udon noodles with chicken','g',100,130,7,18,2,3.5,1,[200,300,400,500]],
+ ['🍝 Chinese fried noodles with chicken','g',100,150,7,19,2,5,1.2,[200,300,400,500]],
  ['🍕 Pizza, cheese (slice)','slice',1,270,11,33,4,10,2.3,[1,2,3,4]],
- ['🍟 McDonald\'s fries, medium','portion',1,330,4,41,0.5,16,4,[1]],
- ['🍟 McDonald\'s fries, large','portion',1,440,5.5,55,0.7,21,5,[1]],
- ['🍗 McDonald\'s McNugget','pcs',1,44,2.8,3.3,0.1,2.2,0.2,[1,3,6,9,20]],
+ ['🍔 Big Mac','pcs',1,508,26.3,39.4,8.5,26.3,3.7,[1,2],2],
+ ['🍔 Cheeseburger','pcs',1,306,16,30,7.3,13,2.3,[1,2,3],2],
+ ['🍔 Double Cheeseburger','pcs',1,408,24,27.2,7,20.8,2.2,[1,2],2],
+ ['🍔 Single Big Tasty Bacon','pcs',1,646,34.8,37.5,7,40.2,2.7,[1],2],
+ ['🍔 McChicken','pcs',1,436,20.7,45.1,5,17.1,2.6,[1,2],2],
+ ['🍔 Chickenburger','pcs',1,277,10.4,41.4,5,7.6,2.6,[1,2,3],2],
+ ['🌯 Snack Wrap','pcs',1,288,12.2,34.2,2,11,1.8,[1,2],2],
+ ['🍟 McDonald\'s fries, medium','portion',1,330,4,41,0.5,16,4,[1],2],
+ ['🍟 McDonald\'s fries, large','portion',1,440,5.5,55,0.7,21,5,[1],2],
+ ['🥤 Milkshake chocolate, small 0.25 l','pcs',1,204,5.8,36,30,4,0.6,[1],2],
+ ['🥤 Milkshake chocolate, large 0.4 l','pcs',1,326,9.2,57,48,6.4,1,[1],2],
+ ['🥤 Milkshake vanilla, small 0.25 l','pcs',1,202,5.2,36,31,3.6,0,[1],2],
+ ['🥤 Milkshake vanilla, large 0.4 l','pcs',1,323,8.3,58,50,5.8,0,[1],2],
+ ['🍪 Chocolate cookie','pcs',1,332,4,38.7,24.8,17.6,0.5,[1,2],2],
+ ['🍪 Triple chocolate cookie','pcs',1,383,4.2,46,31,19,1.8,[1,2],2],
+ ['🍗 McDonald\'s McNugget','pcs',1,44,2.8,3.3,0.1,2.2,0.2,[1,3,6,9,20],2],
  ['🍫 Granko','tsp',1,15,0.2,3.2,3.1,0.1,0.1,[1,2,3,4]],
  ['🍫 Nutella','tsp',1,27,0.3,2.9,2.8,1.5,0.2,[1,2,3,4]],
  ['🥜 Peanut butter','tsp',1,29,1.3,1.0,0.5,2.5,0.3,[1,2,3,4]]
-].map(a=>({n:a[0],u:a[1],b:a[2],k:a[3],p:a[4],c:a[5],s:a[6],f:a[7],fib:a[8],o:a[9]}));
+].map(a=>({n:a[0],u:a[1],b:a[2],k:a[3],p:a[4],c:a[5],s:a[6],f:a[7],fib:a[8],o:a[9],cat:a[10]===1?'drink':a[10]===2?'mc':'food'}));
 let ALL=[];
 const r1=v=>Math.round(v*10)/10;
+const CATS=[['bread','🍞 Bread & breakfast'],['meat','🍗 Meat & fish'],['side','🍚 Sides'],['meal','🍜 Meals & soups'],['veg','🥗 Fruit & veg'],['sweet','🍫 Sweets & spreads'],['drink','🥤 Drinks'],['mc','🍟 McDonald\'s']];
+const CATKEY={bread:['Egg','Toast','Rohlík','Ham','Salami','Cheese','Treska','Greek yogurt'],meat:['Chicken breast','Salmon','Beef'],side:['Rice, cooked','Pasta','Potatoes','Mashed'],
+ meal:['soup','fried rice','Udon','fried noodles','Pizza'],veg:['Broccoli','Cucumber','tomato','salad','Banana','Apple'],sweet:['Granko','Nutella','Peanut','Sugar']};
+FOODS.forEach(f=>{if(f.cat==='food'){for(const k in CATKEY)if(CATKEY[k].some(w=>f.n.includes(w))){f.cat=k;break;}if(f.cat==='food')f.cat='meal';}});
+let CAT='bread';
+$('catTabs').innerHTML=CATS.map(([k,l])=>`<button type="button" class="cat${k===CAT?' on':''}" data-cat="${k}" onclick="setCat('${k}')">${l}</button>`).join('');
+$('fCat').innerHTML=CATS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('');$('fCat').value='meal';
+function setCat(c){CAT=c;document.querySelectorAll('#catTabs .cat').forEach(b=>b.classList.toggle('on',b.dataset.cat===c));
+  $('lFoodLbl').textContent=CATS.find(x=>x[0]===c)[1].replace(/^\S+\s/,'');$('lFood').value='';buildList();}
 function buildList(){
   const keep=$('lFood').value;
-  ALL=FOODS.concat(S.myFoods.map(x=>({...x,mine:1})));
-  let h='<optgroup label="Food list">'+FOODS.map((f,i)=>`<option value="${i}">${esc(f.n)}</option>`).join('')+'</optgroup>';
-  if(S.myFoods.length)h+='<optgroup label="❤️ My Foods">'+S.myFoods.map((f,i)=>`<option value="${FOODS.length+i}">❤️ ${esc(f.n)}</option>`).join('')+'</optgroup>';
+  ALL=FOODS.concat(S.myFoods.map(x=>({...x,cat:(!x.cat||x.cat==='food')?'meal':x.cat,mine:1})));
+  const opt=(f,i)=>f.cat===CAT?`<option value="${i}">${f.mine?'❤️ ':''}${esc(f.n)}</option>`:'';
+  let h=`<optgroup label="${CATS.find(x=>x[0]===CAT)[1]}">`+FOODS.map(opt).join('')+'</optgroup>';
+  const mine=ALL.map((f,i)=>f.mine?opt(f,i):'').join('');
+  if(mine)h+='<optgroup label="❤️ My saved">'+mine+'</optgroup>';
   $('lFood').innerHTML=h;
-  if(keep!==''&&ALL[keep])$('lFood').value=keep;
+  if(keep!==''&&ALL[keep]&&ALL[keep].cat===CAT)$('lFood').value=keep;
   pickFood();
 }
 function curFood(){return ALL[num($('lFood').value)];}
@@ -423,7 +447,7 @@ function addFromList(){
   save();renderDay();
 }
 function delMyFood(){const f=curFood();if(!f||!f.mine||!confirm('Remove from My Foods?'))return;
-  S.myFoods=S.myFoods.filter(x=>x.n!==f.n);save();$('lFood').value='0';buildList();}
+  S.myFoods=S.myFoods.filter(x=>x.n!==f.n);save();$('lFood').value='';buildList();}
 function setMode(m){
   $('modeList').classList.toggle('hide',m!=='list');$('modeMan').classList.toggle('hide',m!=='man');
   $('btnList').classList.toggle('on',m==='list');$('btnMan').classList.toggle('on',m==='man');
