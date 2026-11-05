@@ -27,6 +27,8 @@ button.sec{background:#eeedff;color:#5040c8;box-shadow:none}
 .bar{height:11px;background:#eeedf6;border-radius:99px;overflow:hidden;margin:5px 0 12px}
 .bar>div{height:100%;border-radius:99px;background:linear-gradient(90deg,#7461f2,#ae67e8)}
 .bar.done>div{background:linear-gradient(90deg,#23c994,#56d6a9)}
+.bar.over>div{background:linear-gradient(90deg,#e5484d,#ff6b6b)}
+.over-txt{color:#e5484d;font-weight:700}
 .item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0eff6;font-size:14px}
 .item small{color:var(--mut)}
 .del{background:transparent;color:#e15f78;width:auto;padding:4px 8px;margin:0;font-size:18px;box-shadow:none}
@@ -108,6 +110,10 @@ canvas{width:100%;height:160px}
         <div><label>Fiber g</label><input id="fFib" type="number" inputmode="decimal"></div>
         <div><label>kcal</label><input id="fK" type="number" inputmode="decimal"></div>
       </div>
+      <div class="row">
+        <div><label>Creatine mg (optional)</label><input id="fCr" type="number" inputmode="decimal"></div>
+        <div><label>Drink volume ml (optional)</label><input id="fMl" type="number" inputmode="decimal"></div>
+      </div>
       <label>Save in list</label><select id="fCat"></select>
       <label class="chk"><input type="checkbox" id="fSave" checked> Save to My Foods (per 1 portion)</label>
       <button onclick="addFood()">Add</button>
@@ -163,6 +169,7 @@ canvas{width:100%;height:160px}
     <label>Calories kcal / day</label><input id="tK" type="number" inputmode="decimal">
     <label>Sugar g / day</label><input id="tSugar" type="number" inputmode="decimal">
     <label>Fiber g / day</label><input id="tFiber" type="number" inputmode="decimal">
+    <label>Creatine from food mg / day</label><input id="tCr" type="number" inputmode="decimal">
     <label>Water ml / day</label><input id="tWater" type="number" inputmode="numeric">
     <label>Starting weight (kg)</label><input id="startW" type="number" inputmode="decimal">
     <label>Starting height (cm)</label><input id="startH" type="number" inputmode="decimal">
@@ -195,7 +202,7 @@ function normalize(){
   S.targets=S.targets||{};S.food=S.food||{};S.measures=S.measures||[];S.water=S.water||{};S.starting=S.starting||{};S.myFoods=S.myFoods||[];
   if(S.targets.sugar===undefined)S.targets.sugar=0;
   if(S.targets.fat===undefined)S.targets.fat=0;
-  if(S.targets.fiber===undefined)S.targets.fiber=0;
+  if(S.targets.fiber===undefined)S.targets.fiber=0;if(S.targets.cr===undefined)S.targets.cr=0;
   if(S.targets.water===undefined)S.targets.water=2000;
 }
 normalize();
@@ -232,32 +239,36 @@ function show(v){
 $('dayDate').value=today();
 $('dayDate').onchange=renderDay;
 function dayTotals(d){
-  return (S.food[d]||[]).reduce((a,f)=>({p:a.p+num(f.p),c:a.c+num(f.c),fat:a.fat+num(f.fat),sugar:a.sugar+num(f.sugar),fib:a.fib+num(f.fib),k:a.k+num(f.k)}),{p:0,c:0,fat:0,sugar:0,fib:0,k:0});
+  return (S.food[d]||[]).reduce((a,f)=>({p:a.p+num(f.p),c:a.c+num(f.c),fat:a.fat+num(f.fat),sugar:a.sugar+num(f.sugar),fib:a.fib+num(f.fib),cr:a.cr+num(f.cr),k:a.k+num(f.k)}),{p:0,c:0,fat:0,sugar:0,fib:0,cr:0,k:0});
 }
-function bar(label,val,target,unit){
+function bar(label,val,target,unit,limit){
   if(!target)return `<div class="muted">${label}: ${Math.round(val)} ${unit} · set daily target in Settings</div>`;
   const pct=Math.min(100,val/target*100);
-  return `<div style="font-size:14px">${label}: <b>${Math.round(val)}</b> / ${target} ${unit}</div><div class="bar ${val>=target?'done':''}"><div style="width:${pct}%"></div></div>`;
+  const over=limit&&val>target;
+  const cls=over?'over':(val>=target&&!limit?'done':'');
+  const note=over?` <span class="over-txt">⚠️ ${Math.round(val-target)} ${unit} over limit</span>`:'';
+  return `<div style="font-size:14px">${label}: <b class="${over?'over-txt':''}">${Math.round(val)}</b> / ${target} ${unit}${limit?' (max)':''}${note}</div><div class="bar ${cls}"><div style="width:${pct}%"></div></div>`;
 }
-function waterTotal(d){return (S.water[d]||[]).reduce((a,v)=>a+num(v),0);}
+function drinkMl(d){return (S.food[d]||[]).reduce((a,f)=>a+num(f.ml),0);}
+function waterTotal(d){return (S.water[d]||[]).reduce((a,v)=>a+num(v),0)+drinkMl(d);}
 function renderDay(){
   const d=$('dayDate').value||today(),t=dayTotals(d),T=S.targets;
-  $('totals').innerHTML=bar('Protein',t.p,T.p,'g')+bar('Carbs',t.c,T.c,'g')+bar('Fat',t.fat,T.fat,'g')+bar('Sugar',t.sugar,T.sugar,'g')+bar('Fiber',t.fib,T.fiber,'g')+bar('Calories',t.k,T.k,'kcal')+bar('Water',waterTotal(d),T.water,'ml');
-  $('waterTotal').textContent=waterTotal(d)+' ml logged';
+  $('totals').innerHTML=bar('Protein',t.p,T.p,'g')+bar('Carbs',t.c,T.c,'g')+bar('Fat',t.fat,T.fat,'g',1)+bar('Sugar',t.sugar,T.sugar,'g',1)+bar('Fiber',t.fib,T.fiber,'g')+bar('Creatine (food)',t.cr,T.cr,'mg')+bar('Calories',t.k,T.k,'kcal')+bar('Water + drinks',waterTotal(d),T.water,'ml');
+  $('waterTotal').textContent=waterTotal(d)+' ml in total'+(drinkMl(d)?` (water ${waterTotal(d)-drinkMl(d)} ml + drinks ${drinkMl(d)} ml)`:'');
   $('waterList').innerHTML=(S.water[d]||[]).map((v,i)=>`<div class="item"><span>${v} ml</span><button class="del" onclick="delWater('${d}',${i})">✕</button></div>`).join('');
   const list=S.food[d]||[];
-  $('foodList').innerHTML=list.length?list.map((f,i)=>`<div class="item"><div>${esc(f.n)}<br><small>P ${num(f.p)}g · C ${num(f.c)}g · F ${num(f.fat)}g · Sugar ${num(f.sugar)}g · Fiber ${num(f.fib)}g · ${num(f.k)} kcal</small></div><button class="del" onclick="delFood('${d}',${i})">✕</button></div>`).join(''):'<p class="muted">Nothing yet.</p>';
+  $('foodList').innerHTML=list.length?list.map((f,i)=>`<div class="item"><div>${esc(f.n)}<br><small>P ${num(f.p)}g · C ${num(f.c)}g · F ${num(f.fat)}g · Sugar ${num(f.sugar)}g · Fiber ${num(f.fib)}g · Creatine ${num(f.cr)} mg · ${num(f.k)} kcal</small></div><button class="del" onclick="delFood('${d}',${i})">✕</button></div>`).join(''):'<p class="muted">Nothing yet.</p>';
   const seen={};recent=[];
   Object.keys(S.food).sort().reverse().forEach(k=>S.food[k].slice().reverse().forEach(f=>{if(!seen[f.n]&&recent.length<6){seen[f.n]=1;recent.push(f);}}));
   $('quick').innerHTML=recent.length?'<label>Quick add</label>'+recent.map((f,i)=>`<button class="sec" style="font-size:14px;padding:8px;margin-top:6px" onclick="quickAdd(${i})">${esc(f.n)} (P ${num(f.p)}g)</button>`).join(''):'';
 }
 function addFood(){
-  const f={n:$('fName').value.trim()||'Food',p:num($('fP').value),c:num($('fC').value),fat:num($('fFat').value),sugar:num($('fSugar').value),fib:num($('fFib').value),k:num($('fK').value),meal:selectedMeal};
+  const f={n:$('fName').value.trim()||'Food',p:num($('fP').value),c:num($('fC').value),fat:num($('fFat').value),sugar:num($('fSugar').value),fib:num($('fFib').value),cr:num($('fCr').value),ml:num($('fMl').value),k:num($('fK').value),meal:selectedMeal};
   if(!f.p&&!f.c&&!f.fat&&!f.sugar&&!f.fib&&!f.k)return alert('Enter at least one value');
   const d=$('dayDate').value||today();(S.food[d]=S.food[d]||[]).push(f);
-  if($('fSave').checked&&$('fName').value.trim()){S.myFoods=S.myFoods.filter(x=>x.n!==f.n);S.myFoods.push({n:f.n,u:'portion',b:1,k:f.k,p:f.p,c:f.c,s:f.sugar,f:f.fat,fib:f.fib,cat:$('fCat').value,o:[0.5,1,2]});}
+  if($('fSave').checked&&$('fName').value.trim()){S.myFoods=S.myFoods.filter(x=>x.n!==f.n);S.myFoods.push({n:f.n,u:'portion',b:1,k:f.k,p:f.p,c:f.c,s:f.sugar,f:f.fat,fib:f.fib,cr:f.cr,vol:f.ml,cat:$('fCat').value,o:[0.5,1,2]});}
   save();buildList();
-  ['fName','fP','fC','fFat','fSugar','fFib','fK'].forEach(i=>$(i).value='');renderDay();
+  ['fName','fP','fC','fFat','fSugar','fFib','fCr','fMl','fK'].forEach(i=>$(i).value='');renderDay();
 }
 function quickAdd(i){const f=recent[i];if(!f)return;const d=$('dayDate').value||today();(S.food[d]=S.food[d]||[]).push({...f,meal:selectedMeal});save();renderDay();}
 function delFood(d,i){if(!S.food[d]||!confirm('Delete this food?'))return;S.food[d].splice(i,1);if(!S.food[d].length)delete S.food[d];save();renderDay();}
@@ -318,12 +329,12 @@ function renderBody(){
 
 /* SETTINGS */
 function renderSet(){
-  $('tP').value=S.targets.p||'';$('tC').value=S.targets.c||'';$('tFat').value=S.targets.fat||'';$('tK').value=S.targets.k||'';$('tSugar').value=S.targets.sugar||'';$('tFiber').value=S.targets.fiber||'';$('tWater').value=S.targets.water||'';
+  $('tP').value=S.targets.p||'';$('tC').value=S.targets.c||'';$('tFat').value=S.targets.fat||'';$('tK').value=S.targets.k||'';$('tSugar').value=S.targets.sugar||'';$('tFiber').value=S.targets.fiber||'';$('tCr').value=S.targets.cr||'';$('tWater').value=S.targets.water||'';
   $('startW').value=S.starting.w||'';$('startH').value=S.starting.h||'';
   $('lastBackup').textContent=S.lastBackup?'Last backup: '+S.lastBackup:'No backup yet.';
 }
 function saveTargets(){
-  S.targets={p:num($('tP').value),c:num($('tC').value),fat:num($('tFat').value),k:num($('tK').value),sugar:num($('tSugar').value),fiber:num($('tFiber').value),water:num($('tWater').value)};
+  S.targets={p:num($('tP').value),c:num($('tC').value),fat:num($('tFat').value),k:num($('tK').value),sugar:num($('tSugar').value),fiber:num($('tFiber').value),cr:num($('tCr').value),water:num($('tWater').value)};
   S.starting={w:num($('startW').value),h:num($('startH').value)};
   // put starting weight/height into history once, if history is empty
   if(!S.measures.length&&(S.starting.w||S.starting.h))S.measures.push({d:today(),w:S.starting.w,h:S.starting.h,wa:0,pu:0});
@@ -350,9 +361,19 @@ const G=[50,100,150,200,250],D=[250,330,500];
 const FOODS=[
  ['🥚 Egg, medium','pcs',1,63,5.5,0.3,0.2,4.2,0,[1,2,3,4]],
  ['🍞 Toast bread (slice 25 g)','slice',1,67,2.3,12.3,1.3,0.9,0.7,[1,2,3,4]],
+ ['🍞 Kváskový toast (slice 23 g)','slice',1,53,1.8,9.7,0.1,0.7,0.5,[1,2,3,4]],
+ ['🥯 Bagel, plain (~90 g)','pcs',1,250,9.5,49,5,1.5,2,[0.5,1,2]],
+ ['🌭 Spišské párky (1 piece ~50 g)','pcs',1,135,6,0.8,0.5,12,0,[1,2,3,4]],
+ ['🥞 Palacinky, homemade (1 piece)','pcs',1,111,6,15,3,2.9,0.4,[1,2,3,4,5]],
+ ['🥞 Pancakes, homemade (1 piece ~12 cm)','pcs',1,99,4.1,17.2,2.4,1.3,0.5,[1,2,3,4,5,6]],
  ['🥖 Rohlík (50 g)','pcs',1,150,4.5,29,1.5,1.5,1.5,[0.5,1,2,3]],
  ['🥩 Pork tenderloin (panenka), grilled','g',10,15,2.6,0,0,0.4,0,G],
  ['🥓 Bacon, fried (slice ~10 g)','slice',1,45,3.5,0.1,0,3.5,0,[1,2,3,4,5]],
+ ['🍗 Chicken leg, air fryer (meat, skin on)','g',100,215,26,0,0,12,0,[100,150,200,250,300]],
+ ['🍗 Chicken wings, air fryer','g',100,240,24,0,0,16,0,[100,150,200,250,300]],
+ ['🐟 Alaska pollock (treska aljašská), baked','g',100,95,20,0,0,1.2,0,G],
+ ['🐟 Zubáč (pikeperch), baked','g',100,110,24,0,0,1.3,0,G],
+ ['🐟 Pstruh (trout), baked','g',100,150,22,0,0,6.5,0,G],
  ['🍗 Chicken breast, grilled','g',10,17,3.1,0,0,0.4,0,G],
  ['🐟 Salmon, cooked','g',10,21,2.0,0,0,1.3,0,G],
  ['🥩 Beef / steak, cooked','g',10,22,2.3,0,0,1.3,0,G],
@@ -364,6 +385,10 @@ const FOODS=[
  ['🍝 Pasta, cooked','g',10,16,0.6,3.1,0.1,0.1,0.2,G],
  ['🥔 Potatoes, boiled','g',10,8,0.2,1.8,0.1,0,0.2,G],
  ['🥔 Mashed potatoes','g',10,11,0.2,1.7,0.2,0.4,0.2,G],
+ ['🥕 Carrot','g',100,41,0.9,9.6,4.7,0.2,2.8,[50,100,150]],
+ ['🥬 Romaine lettuce (rímsky šalát)','g',100,17,1.2,3.3,1.2,0.3,2.1,[30,50,100]],
+ ['🧅 Onion','g',100,40,1.1,9.3,4.2,0.1,1.7,[20,50,100]],
+ ['🟢 Peas, cooked','g',100,84,5.4,15.6,5.9,0.2,5.5,[50,100,150]],
  ['🥦 Broccoli, cooked','g',100,35,2.4,7.2,1.4,0.4,3.3,[50,100,150,200]],
  ['🥒 Cucumber','g',100,15,0.7,3.6,1.7,0.1,0.5,[50,100,150,200]],
  ['🍅 Cherry tomato (piece)','pcs',1,3,0.1,0.6,0.4,0,0.2,[3,5,8,10]],
@@ -371,6 +396,15 @@ const FOODS=[
  ['🫐 Blueberries','g',100,57,0.7,14.5,10,0.3,2.4,[50,100,125,150]],
  ['🍓 Strawberries','g',100,32,0.7,7.7,4.9,0.3,2,[50,100,150,200,250]],
  ['🍇 Raspberries','g',100,52,1.2,11.9,4.4,0.7,6.5,[50,100,125,150]],
+ ['🥜 Cashews','tbsp',1,52,1.6,3,0.5,4.2,0.3,[1,2,3,4,8]],
+ ['🌰 Almonds','tbsp',1,52,1.9,2,0.4,4.5,1.1,[1,2,3,4,8]],
+ ['🌰 Walnuts','tbsp',1,49,1.1,1,0.2,4.9,0.5,[1,2,3,4,8]],
+ ['🌰 Hazelnuts','tbsp',1,53,1.3,1.4,0.4,5.2,0.8,[1,2,3,4,8]],
+ ['🍐 Pear, medium (~180 g)','pcs',1,103,0.7,27,17,0.3,5.5,[0.5,1,2]],
+ ['🍇 Grapes','g',100,69,0.7,18,15.5,0.2,0.9,[50,100,150,200]],
+ ['🍊 Orange, medium (~150 g)','pcs',1,70,1.4,17.5,14,0.2,3.3,[0.5,1,2]],
+ ['🍊 Clementine (~75 g)','pcs',1,35,0.6,9,6.8,0.1,1.3,[1,2,3,4]],
+ ['🍊 Grapefruit, half (~120 g)','half',1,50,0.9,12.5,8.5,0.2,2,[1,2]],
  ['🍌 Banana, medium','pcs',1,105,1.3,27,14,0.4,3.1,[0.5,1,2]],
  ['🍎 Apple, medium','pcs',1,111,0.4,26.9,19,0.4,4.8,[0.5,1,2]],
  ['🥛 Milk, whole 3.5%','ml',100,61,3.3,4.6,4.6,3.2,0,[100,200,250,300,500],1],
@@ -378,10 +412,17 @@ const FOODS=[
  ['☕ Cappuccino with milk, no sugar','cup',1,75,4,6,6,4,0,[1,2],1],
  ['🥄 Sugar','tsp',1,16,0,4,4,0,0,[1,2,3]],
  ['🐟 Treska Cottage Exklusiv (pack 140 g)','g',100,178,10,8.8,3.0,13,0,[35,70,105,140]],
+ ['🥛 Yogurt, low-fat plain (0.5–1%)','g',100,45,4.5,5.5,5.5,0.5,0,[100,150,200,250]],
+ ['🥛 Yogurt, white plain (3%)','g',100,63,3.8,4.7,4.7,3.2,0,[100,150,200,250]],
+ ['🥄 Sour cream 14% (tbsp ~15 g)','tbsp',1,22,0.4,0.5,0.5,2.1,0,[1,2,3,4]],
  ['🥣 Greek yogurt / Skyr, plain','g',100,65,9,4.5,4,1.8,0,[100,150,200,250]],
  ['🥤 Protein shake (powder)','scoop',1,120,24,3,1.5,2,1,[0.5,1,1.5,2],1],
  ['🥛 Milk 250 ml + 2 tsp Granko (whole milk)','glass',1,183,8.7,17.9,17.7,8.2,0.2,[1,2],1],
  ['🥛 Milk 250 ml + 2 tsp Granko (1.5% milk)','glass',1,145,8.9,18.4,18.2,4,0.2,[1,2],1],
+ ['🍵 Tea 250 ml + 1 tsp honey + 1 tsp lemon','cup',1,22,0,5.9,5.8,0,0,[1,2,3],1],
+ ['☕ Espresso, no sugar (~30 ml)','cup',1,1,0.1,0,0,0,0,[1,2],1],
+ ['☕ Lungo, no sugar (~110 ml)','cup',1,2,0.2,0,0,0,0,[1,2],1],
+ ['☕ Lungo with milk, no sugar (~110 ml + 50 ml milk)','cup',1,25,1.9,2.4,2.4,0.8,0,[1,2],1],
  ['🥤 Coca-Cola','ml',100,42,0,10.6,10.6,0,0,D,1],
  ['🥤 Coca-Cola Zero','ml',100,0.3,0,0,0,0,0,D,1],
  ['🥤 Sprite','ml',100,19,0,4.6,4.6,0,0,D,1],
@@ -397,6 +438,12 @@ const FOODS=[
  ['🥟 Spring roll','pcs',1,150,3.5,17,2,7.5,1,[1,2,3,4]],
  ['🍚 Egg fried rice (no meat)','g',100,165,4.5,25,1,5.5,0.8,[150,200,300]],
  ['🍽️ Pork tenderloin grilled with bacon','g',100,210,27,0.5,0.5,11,0,[150,200,250,300]],
+ ['🍲 Lentil / chickpea soup with coconut milk','ml',100,90,4,10,2,4,3,[250,300,400,500]],
+ ['🥦 Broccoli cream soup (with cream)','ml',100,70,2,4,2,5,1,[250,300,400,500]],
+ ['🍖 Rezeň bravčový (pork schnitzel, fried)','g',100,260,20,12,0.5,15,0.6,[100,150,200,250]],
+ ['🍖 Rezeň teľací (veal schnitzel, fried)','g',100,240,22,12,0.5,12,0.6,[100,150,200,250]],
+ ['🍛 Chicken curry (coconut milk, zucchini, curry paste)','g',100,130,11,4,2,8,1,[200,300,400]],
+ ['🥡 Chinese chicken with broccoli','g',100,110,11,6,2.5,5,1.5,[200,300,400]],
  ['🍕 Pizza, cheese (slice)','slice',1,270,11,33,4,10,2.3,[1,2,3,4]],
  ['🍔 Big Mac','pcs',1,508,26.3,39.4,8.5,26.3,3.7,[1,2],2],
  ['🍔 Cheeseburger','pcs',1,306,16,30,7.3,13,2.3,[1,2,3],2],
@@ -414,28 +461,67 @@ const FOODS=[
  ['🍪 Chocolate cookie','pcs',1,332,4,38.7,24.8,17.6,0.5,[1,2],2],
  ['🍪 Triple chocolate cookie','pcs',1,383,4.2,46,31,19,1.8,[1,2],2],
  ['🍗 McDonald\'s McNugget','pcs',1,44,2.8,3.3,0.1,2.2,0.2,[1,3,6,9,20],2],
+ ['🫒 Olive oil','tbsp',1,119,0,0,0,13.5,0,[0.5,1,2,3]],
+ ['🫒 Olive oil (teaspoon)','tsp',1,40,0,0,0,4.5,0,[1,2,3]],
+ ['🌼 Canola / rapeseed oil','tbsp',1,124,0,0,0,14,0,[0.5,1,2,3]],
+ ['🧈 Ghee (clarified butter)','tsp',1,40,0,0,0,4.5,0,[1,2,3,4]],
+ ['🧈 Butter','tsp',1,36,0,0,0,4.1,0,[1,2,3,4]],
+ ['🥣 Krupičná kaša (semolina with milk)','g',100,100,3.6,15,7,3,0.3,[150,200,250,300]],
+ ['🍮 Puding (with milk)','g',100,110,3,18,13,3,0.2,[100,150,200]],
+ ['🍪 Oreo cookie','pcs',1,53,0.6,7.6,4.2,2.2,0.3,[1,2,3,4,6]],
+ ['🍫 Milka milk chocolate (cube ~4 g)','cube',1,22,0.3,2.4,2.4,1.3,0.1,[3,6,12,24]],
+ ['🍮 Müller Milchreis chocolate (cup 200 g)','cup',1,230,6.6,37,22,6,1,[0.5,1]],
+ ['🐻 Gummy bears (bag 100 g)','g',100,343,6.9,77,46,0.5,0,[25,50,100]],
  ['🍫 Granko','tsp',1,15,0.2,3.2,3.1,0.1,0.1,[1,2,3,4]],
  ['🍫 Nutella','tsp',1,27,0.3,2.9,2.8,1.5,0.2,[1,2,3,4]],
  ['🥜 Peanut butter','tsp',1,29,1.3,1.0,0.5,2.5,0.3,[1,2,3,4]]
-].map(a=>({n:a[0],u:a[1],b:a[2],k:a[3],p:a[4],c:a[5],s:a[6],f:a[7],fib:a[8],o:a[9],cat:a[10]===1?'drink':a[10]===2?'mc':'food'}));
+].map(a=>({n:a[0],u:a[1],b:a[2],k:a[3],p:a[4],c:a[5],s:a[6],f:a[7],fib:a[8],o:a[9],cat:a[10]===1?'drink':a[10]===2?'mc':'food',cr:0}));
+// CREATINE estimates in mg per the item's base amount (cooked weight). Approximate.
+const CRE=[['Big Tasty',450],['Chicken leg',300],['Chicken wings',280],['Alaska pollock',300],['Zubáč',350],['Pstruh',400],['Spišské',20],['Rezeň',300],['Chicken curry',200],['Chinese chicken',200],['Lungo with milk',5],['Pork tenderloin (panenka)',45],['grilled with bacon',420],['Bacon',20],['Chicken breast',35],['Salmon',40],['Beef',45],
+ ['Ham',40],['Salami',20],['Treska',150],['Chicken noodle soup',10],['Chicken fried rice',70],['Udon',70],['fried noodles',70],
+ ['Sweet and sour',120],['Kung Pao',150],['cashew',150],['Spring roll',10],['Milk 250 ml',25],['Milk,',10],['Cappuccino',15],
+ ['Big Mac',350],['Double Cheeseburger',360],['Cheeseburger',180],['McChicken',250],['Chickenburger',120],
+ ['Snack Wrap',150],['McNugget',30],['Milkshake chocolate, small',25],['Milkshake vanilla, small',25],['Milkshake chocolate, large',40],['Milkshake vanilla, large',40]];
+const VOL=[['Tea 250',250],['Espresso',30],['Lungo with milk',160],['Lungo',110],['Cappuccino',180],['Granko',250],['Protein shake',300]];
+FOODS.forEach(f=>{if(f.cat==='drink'){if(f.u==='ml')f.vol=1;else{const v=VOL.find(x=>f.n.includes(x[0]));f.vol=v?v[1]:0;}}});
+FOODS.forEach(f=>{const m=CRE.find(c=>f.n.includes(c[0]));if(m)f.cr=m[1];});
 let ALL=[];
 const r1=v=>Math.round(v*10)/10;
-const CATS=[['bread','🍞 Bread & breakfast'],['meat','🍗 Meat & fish'],['side','🍚 Sides'],['meal','🍜 Meals & soups'],['veg','🥗 Fruit & veg'],['sweet','🍫 Sweets & spreads'],['drink','🥤 Drinks'],['mc','🍟 McDonald\'s']];
-const CATKEY={bread:['Egg','Toast','Rohlík','Ham','Salami','Cheese','Treska','Greek yogurt'],meat:['Chicken breast','Salmon','Beef','Pork tenderloin (panenka)','Bacon'],side:['air fryer','Rice, cooked','Pasta','Potatoes','Mashed'],
- meal:['grilled with bacon','Sweet and sour','Kung Pao','cashew','Spring roll','Egg fried rice','soup','fried rice','Udon','fried noodles','Pizza'],veg:['Blueberries','Strawberries','Raspberries','Broccoli','Cucumber','tomato','salad','Banana','Apple'],sweet:['Granko','Nutella','Peanut','Sugar']};
-FOODS.forEach(f=>{if(f.cat==='food'){for(const k of ['meal','bread','meat','side','veg','sweet'])if(CATKEY[k].some(w=>f.n.includes(w))){f.cat=k;break;}if(f.cat==='food')f.cat='meal';}});
+const CATS_=0;const CATS=[['bread','🍞 Bread & breakfast'],['meat','🍗 Meat & fish'],['side','🍚 Sides'],['meal','🍜 Meals & soups'],['veg','🥗 Fruit & veg'],['sweet','🍫 Sweets & spreads'],['fat','🧈 Oils & butter'],['drink','🥤 Drinks'],['mc','🍟 McDonald\'s']];
+const CATKEY={bread:['Palacinky','Pancakes','Spišské','Bacon','Bagel','Yogurt','Sour cream','Egg','Toast','toast','Rohlík','Ham','Salami','Cheese','Treska','Greek yogurt'],meat:['Chicken leg','Chicken wings','Alaska pollock','Zubáč','Pstruh','Chicken breast','Salmon','Beef','Pork tenderloin (panenka)'],side:['air fryer','Rice, cooked','Pasta','Potatoes','Mashed'],
+ meal:['Lentil','cream soup','Rezeň','curry','Chinese chicken','grilled with bacon','Sweet and sour','Kung Pao','cashew','Spring roll','Egg fried rice','soup','fried rice','Udon','fried noodles','Pizza'],veg:['Carrot','Romaine','Onion','Peas','Cashews','Almonds','Walnuts','Hazelnuts','Pear','Grapes','Orange','Clementine','Grapefruit','Blueberries','Strawberries','Raspberries','Broccoli','Cucumber','tomato','salad','Banana','Apple'],fat:['Olive oil','Canola','Ghee','Butter'],sweet:['Krupičná','Puding','Oreo','Milka','Müller','Gummy','Granko','Nutella','Peanut','Sugar']};
+FOODS.forEach(f=>{if(f.cat==='food'){for(const k of ['meat','meal','fat','bread','side','veg','sweet'])if(CATKEY[k].some(w=>f.n.includes(w))){f.cat=k;break;}if(f.cat==='food')f.cat='meal';}});
 let CAT='bread';
 $('catTabs').innerHTML=CATS.map(([k,l])=>`<button type="button" class="cat${k===CAT?' on':''}" data-cat="${k}" onclick="setCat('${k}')">${l}</button>`).join('');
 $('fCat').innerHTML=CATS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('');$('fCat').value='meal';
 function setCat(c){CAT=c;document.querySelectorAll('#catTabs .cat').forEach(b=>b.classList.toggle('on',b.dataset.cat===c));
   $('lFoodLbl').textContent=CATS.find(x=>x[0]===c)[1].replace(/^\S+\s/,'');$('lFood').value='';buildList();}
+// Subgroups inside each button (order = display order); items inside are sorted A–Z
+const SUBS={
+ bread:[['🥞 Pancakes',['Palacinky','Pancakes']],['🍞 Bread & pastry',['Toast','toast','Bagel','Rohlík']],['🥚 Eggs, ham & sausages',['Egg','Bacon','Ham','Salami','Spišské']],['🥛 Dairy',['Cheese','Yogurt','yogurt','Sour cream']],['🐟 Spreads',[]]],
+ meat:[['🍗 Chicken',['Chicken']],['🐷 Pork',['Pork']],['🐄 Beef',['Beef']],['🐟 Fish',[]]],
+ side:[['🍚 Rice & pasta',['Rice','Pasta']],['🥔 Potatoes & fries',[]]],
+ meal:[['🍲 Soups',['soup']],['🥡 Asian & curry',['fried rice','Udon','noodles','Sweet and sour','Kung Pao','cashew','Spring roll','curry','Chinese']],['🍖 Home meals',['Rezeň','tenderloin']],['🍕 Other',[]]],
+ veg:[['🍎 Fruit',['Blueberries','Strawberries','Raspberries','Pear','Grapes','Orange','Clementine','Grapefruit','Banana','Apple']],['🥜 Nuts',['Cashews','Almonds','Walnuts','Hazelnuts']],['🥦 Vegetables',[]]],
+ sweet:[['🍮 Desserts',['Krupičná','Puding','Müller']],['🍫 Sweets & snacks',['Oreo','Milka','Gummy']],['🥄 Spreads & sugar',[]]],
+ fat:[['🫒 Oils',['oil']],['🧈 Butter & ghee',[]]],
+ drink:[['🥛 Milk & shakes',['Milk','Protein']],['☕ Coffee & tea',['Cappuccino','Espresso','Lungo','Tea 250']],['🥤 Soft drinks',[]]],
+ mc:[['🍔 Burgers & wraps',[]],['🍗 Nuggets',['McNugget']],['🍟 Fries',['fries']],['🥤 Milkshakes',['Milkshake']],['🍪 Desserts',['cookie']]]
+};
+const SUBORDER={veg:['🍎 Fruit','🥦 Vegetables','🥜 Nuts']};
+const clean=n=>n.replace(/^\S+\s/,'');
+FOODS.forEach(f=>{const g=SUBS[f.cat];if(!g)return;const m=g.find(([l,ks])=>ks.some(k=>f.n.includes(k)));f.sub=m?m[0]:g.find(([l,ks])=>!ks.length)[0];});
 function buildList(){
   const keep=$('lFood').value;
   ALL=FOODS.concat(S.myFoods.map(x=>({...x,cat:(!x.cat||x.cat==='food')?'meal':x.cat,mine:1})));
-  const opt=(f,i)=>f.cat===CAT?`<option value="${i}">${f.mine?'❤️ ':''}${esc(f.n)}</option>`:'';
-  let h=`<optgroup label="${CATS.find(x=>x[0]===CAT)[1]}">`+FOODS.map(opt).join('')+'</optgroup>';
-  const mine=ALL.map((f,i)=>f.mine?opt(f,i):'').join('');
-  if(mine)h+='<optgroup label="❤️ My saved">'+mine+'</optgroup>';
+  const opt=(f,i)=>`<option value="${i}">${f.mine?'❤️ ':''}${esc(f.n)}</option>`;
+  const items=ALL.map((f,i)=>({f,i})).filter(x=>x.f.cat===CAT);
+  const az=(a,b)=>clean(a.f.n).localeCompare(clean(b.f.n),'en');
+  const order=SUBORDER[CAT]||(SUBS[CAT]||[]).map(x=>x[0]);
+  let h='';
+  order.forEach(lbl=>{const g=items.filter(x=>!x.f.mine&&x.f.sub===lbl).sort(az);if(g.length)h+=`<optgroup label="${lbl}">`+g.map(x=>opt(x.f,x.i)).join('')+'</optgroup>';});
+  const mine=items.filter(x=>x.f.mine).sort(az);
+  if(mine.length)h+='<optgroup label="❤️ My saved">'+mine.map(x=>opt(x.f,x.i)).join('')+'</optgroup>';
   $('lFood').innerHTML=h;
   if(keep!==''&&ALL[keep]&&ALL[keep].cat===CAT)$('lFood').value=keep;
   pickFood();
@@ -445,19 +531,19 @@ function pickFood(){
   const f=curFood();if(!f)return;
   $('lAmtLbl').textContent='Amount ('+f.u+')';
   $('lAmt').value=f.u==='g'||f.u==='ml'?f.o[1]||f.o[0]:1;
-  $('lChips').innerHTML=f.o.map(v=>`<button type="button" onclick="setAmt(${v})">${v} ${f.u}</button>`).join('')+
+  $('lChips').innerHTML=f.o.map(v=>`<button type="button" onclick="setAmt(${v})">${f.u==='tbsp'&&v===8&&/Cashews|Almonds|Walnuts|Hazelnuts/.test(f.n)?'½ cup':v+' '+f.u}</button>`).join('')+
     (f.mine?`<button type="button" style="background:#ffe9ee;color:#c0405c" onclick="delMyFood()">🗑 Remove from My Foods</button>`:'');
   previewList();
 }
 function setAmt(v){$('lAmt').value=v;previewList();}
 function calc(){const f=curFood(),a=num($('lAmt').value),m=a/f.b;
-  return {f,a,v:{k:Math.round(f.k*m),p:r1(f.p*m),c:r1(f.c*m),sugar:r1(f.s*m),fat:r1(f.f*m),fib:r1((f.fib||0)*m)}};}
+  return {f,a,v:{k:Math.round(f.k*m),p:r1(f.p*m),c:r1(f.c*m),sugar:r1(f.s*m),fat:r1(f.f*m),fib:r1((f.fib||0)*m),cr:Math.round((f.cr||0)*m)}};}
 function previewList(){const {v}=calc();
-  $('lPrev').innerHTML=`<b>${v.k} kcal</b> · Protein ${v.p} g · Carbs ${v.c} g · Sugar ${v.sugar} g · Fat ${v.fat} g · Fiber ${v.fib} g`;}
+  $('lPrev').innerHTML=`<b>${v.k} kcal</b> · Protein ${v.p} g · Carbs ${v.c} g · Sugar ${v.sugar} g · Fat ${v.fat} g · Fiber ${v.fib} g · Creatine ${v.cr} mg`;}
 function addFromList(){
   const {f,a,v}=calc();if(!a)return alert('Enter amount');
   const d=$('dayDate').value||today();
-  (S.food[d]=S.food[d]||[]).push({n:`${f.mine?f.n:f.n.replace(/^\S+\s/,'')} – ${a} ${f.u}`,...v,meal:selectedMeal});
+  (S.food[d]=S.food[d]||[]).push({n:`${f.mine?f.n:f.n.replace(/^\S+\s/,'')} – ${a} ${f.u}`,...v,ml:f.cat==='drink'?Math.round((f.vol||0)*a):0,meal:selectedMeal});
   save();renderDay();
 }
 function delMyFood(){const f=curFood();if(!f||!f.mine||!confirm('Remove from My Foods?'))return;
